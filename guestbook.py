@@ -65,6 +65,30 @@ class MainPage(webapp2.RequestHandler):
 
 class SignupPage(webapp2.RequestHandler):
 
+    USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
+    PW_RE = re.compile(r"^.{3,20}$")
+    EMAIL_RE = re.compile(r"^[\S]+@[\S]+\.[\S]+$")
+    ##
+    # Validate the username
+    # @param: username
+    # @returns: true if valid username, otherwise false    
+    def valid_username(self, username):
+        return self.USER_RE.match(username)
+
+    ##
+    # Validate the password
+    # @param: password
+    # @returns: true if valid paasword, otherwise false    
+    def valid_password(self, password):
+        return self.USER_RE.match(password)
+
+    ##
+    # Validate the email
+    # @param: email
+    # @returns: true if valid email, otherwise false    
+    def valid_email(self, email):
+        return self.USER_RE.match(email)
+    
     def get(self):
         #self.response.headers['Content-Type'] = 'text/plain'
         self.response.write(render_str('signup.html'))
@@ -72,7 +96,11 @@ class SignupPage(webapp2.RequestHandler):
     def post(self):
 	#self.response.headers['Content-Type'] = 'text/plain'
 	#self.response.write(form1 % self.wtta(self.request.get('text')))
-        self.response.write(render_str('signup.html'))
+        if not(self.valid_username(self.request.get('username'))):
+            self.response.out.write(render_str('signup.html', oldtext = self.request.get('username'),usernameerror = 'Thats not a valid username'))
+        else:
+            
+            self.response.out.write(render_str('signup.html'))
 		
 
 
