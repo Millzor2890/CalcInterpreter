@@ -1,0 +1,17 @@
+application: millzor2890
+version: 1
+runtime: python27
+api_version: 1
+threadsafe: true
+
+handlers:
+- url: /.*
+  script: guestbook.application
+  
+libraries:
+- name: jinja2
+  version: latest
+- name: markupsafe
+  version: latest
+- name: django
+  version: latest
