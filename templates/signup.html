@@ -9,19 +9,28 @@
 			<label>Username: 
 				<input type="text" name="username" value="{{oldtext}}"> 
 			</label>
-			<label name =uerror>
+			<label name ="uerror">
 			{{usernameerror}}
 			</label>
 			<br>
 			<label>Password: 
-			<input type="text" name="password"> 
+			<input type="password" name="password"> 
+			</label>
+			<label name="pwerror">
+			{{passworderror}}
 			</label>
 			<br><label>Re-type Password: 
-			<input type="text" name="password1"> 
+			<input type="password" name="verify"> 
+			</label>
+			<label name="pwerror2">
+			{{passworderror2}}
 			</label>
 			<br>
 			<label>Email address: 
 			<input type="text" name="email"> 
+			</label>
+			<label name="emerror">
+			{{emailerror}}
 			</label>
 			<br>
 			<input type="submit">

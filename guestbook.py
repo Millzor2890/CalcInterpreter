@@ -63,6 +63,11 @@ class MainPage(webapp2.RequestHandler):
 	#self.response.headers['Content-Type'] = 'text/plain'
 	self.response.write(form1 % self.wtta(self.request.get('text')))
 
+	
+class WelcomePage(webapp2.RequestHandler):
+    def get(self):
+        self.response.write(render_str('welcome.html', username = self.request.get('username')))
+
 class SignupPage(webapp2.RequestHandler):
 
     USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
@@ -80,28 +85,56 @@ class SignupPage(webapp2.RequestHandler):
     # @param: password
     # @returns: true if valid paasword, otherwise false    
     def valid_password(self, password):
-        return self.USER_RE.match(password)
+        return self.PW_RE.match(password)
+
+    ##
+    # Validate the password
+    # @param: password
+    # @returns: true if valid paasword, otherwise false    
+    def valid_password1(self, password, password1):
+        return password == password1
 
     ##
     # Validate the email
     # @param: email
     # @returns: true if valid email, otherwise false    
     def valid_email(self, email):
-        return self.USER_RE.match(email)
+        return self.EMAIL_RE.match(email) or email == ""
     
     def get(self):
         #self.response.headers['Content-Type'] = 'text/plain'
         self.response.write(render_str('signup.html'))
     	
     def post(self):
-	#self.response.headers['Content-Type'] = 'text/plain'
-	#self.response.write(form1 % self.wtta(self.request.get('text')))
+        flag = True
+        oldtext1 = self.request.get('username')
+        usernameerror1 = ""
+        passworderror1 = ""
+        passworderror3 = ""
+        emailerror1 =""
         if not(self.valid_username(self.request.get('username'))):
-            self.response.out.write(render_str('signup.html', oldtext = self.request.get('username'),usernameerror = 'Thats not a valid username'))
-        else:
+            usernameerror1 = 'Thats not a valid username'
+            flag = False
+        if not(self.valid_password(self.request.get('password'))):
+            passworderror1 = 'Thats not a valid password'
+            flag = False
+        # This should be the thing that checks they are the same
+        if not(self.valid_password1(self.request.get('password'),self.request.get('verify'))):
+            passworderror3 = 'Those passwords dont match'
+            flag = False
+        #This just checks the email
+        if not(self.valid_email(self.request.get('email'))):
+            emailerror1 = "That is not a valid email"
+            flag = False
             
-            self.response.out.write(render_str('signup.html'))
+        #else:
+        if flag:
+            self.redirect('/welcome?username='+oldtext1)
+        else:
+            self.response.write(render_str('signup.html', oldtext =oldtext1,usernameerror=usernameerror1
+                                       , passworderror= passworderror1, passworderror2 =passworderror3,
+                                       emailerror =emailerror1))
 		
 
 
-application = webapp2.WSGIApplication([('/', MainPage),('/signup', SignupPage)], debug=True)
+application = webapp2.WSGIApplication([('/', MainPage),('/signup', SignupPage),('/welcome', WelcomePage)], debug=True)
