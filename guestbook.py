@@ -68,6 +68,33 @@ class WelcomePage(webapp2.RequestHandler):
     def get(self):
         self.response.write(render_str('welcome.html', username = self.request.get('username')))
 
+        
+class BlogPost(db.Model):
+    title = db.StringProperty(required = True)
+    blog_content = db.TextProperty(required = True)
+    date_created = db.DateTimeProperty(auto_now_add = True)
+
+class BlogPage(webapp2.RequestHandler):
+    def get(self):
+        posts = db.GqlQuery('SELECT * from BlogPost order by date_created desc')
+        self.response.write(render_str('blog.html', posts = posts))
+        
+
+class NewPost(webapp2.RequestHandler):
+    def get(self):
+        self.response.write(render_str('newpost.html'))
+
+    def post(self):
+        old_title = self.request.get('subject')
+        obp = self.request.get('content')
+        if old_title and obp:
+            bp = BlogPost(title = old_title, blog_content = obp)
+            bp.put()
+            self.response.write(render_str('newpost.html'))
+        else: 
+            self.response.write(render_str('newpost.html', old_title = old_title, old_blog_post = obp))
+        
+
 class SignupPage(webapp2.RequestHandler):
 
     USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
@@ -137,4 +164,5 @@ class SignupPage(webapp2.RequestHandler):
 		
 
 
-application = webapp2.WSGIApplication([('/', MainPage),('/signup', SignupPage),('/welcome', WelcomePage)], debug=True)
+application = webapp2.WSGIApplication([('/', MainPage),('/signup', SignupPage),('/welcome', WelcomePage),('/blog/newpost', NewPost)
+                                       ,('/blog', BlogPage)], debug=True)
