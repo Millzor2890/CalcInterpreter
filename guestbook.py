@@ -78,6 +78,14 @@ class BlogPage(webapp2.RequestHandler):
     def get(self):
         posts = db.GqlQuery('SELECT * from BlogPost order by date_created desc')
         self.response.write(render_str('blog.html', posts = posts))
+
+class PermaPost(webapp2.RequestHandler):
+    def get(self, post_id):
+        ## search for the post in the database using GQL
+        ## Use that post to generate a page with a single blog post.
+        key = db.Key.from_path('BlogPost', int(post_id))
+        posts = db.get(key)
+        self.response.write(render_str('permalink.html', posts = posts))
         
 
 class NewPost(webapp2.RequestHandler):
@@ -90,7 +98,8 @@ class NewPost(webapp2.RequestHandler):
         if old_title and obp:
             bp = BlogPost(title = old_title, blog_content = obp)
             bp.put()
-            self.response.write(render_str('newpost.html'))
+            # get the ID and pass it to the redirect page
+            self.redirect('/blog/'+str(bp.key().id()) )
         else: 
             self.response.write(render_str('newpost.html', old_title = old_title, old_blog_post = obp))
         
@@ -165,4 +174,4 @@ class SignupPage(webapp2.RequestHandler):
 
 
 application = webapp2.WSGIApplication([('/', MainPage),('/signup', SignupPage),('/welcome', WelcomePage),('/blog/newpost', NewPost)
-                                       ,('/blog', BlogPage)], debug=True)
+                                       ,('/blog', BlogPage), ('/blog/([0-9]+)', PermaPost)], debug=True)
