@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Miller Time</title>
+		<link rel="stylesheet" type="text/css" href="blog.css">
+	</head>
+	
+	<body>
+		<h1>My Blog</h1>
+		<hr>
+			{% for post in posts %}
+				<div>
+					<div>{{post.title}}</div>
+					<pre>{{post.blog_content}}</pre>
+				</div>
+			{% endfor %}
+	</body>
+</html>
