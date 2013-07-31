@@ -6,6 +6,7 @@ import random
 import string
 import hashlib
 import hmac
+import json
 
 import webapp2
 import jinja2
@@ -156,7 +157,27 @@ class LogoutPage(webapp2.RequestHandler):
         self.response.headers.add_header('Set-Cookie',str('user_id=; Path=/'))
         self.redirect('/signup')
     
-            
+class Perma2Json(webapp2.RequestHandler): 
+    # Implement Json here
+    # Note: Will need the post ID to find in the database
+    # Note:  Will need to use the small json parser to dumps()?
+    def get(self, post_id):
+        ## search for the post in the database using GQL
+        ## Use that post to generate a page with a single blog post.
+        key = db.Key.from_path('BlogPost', int(post_id))
+        posts = db.get(key)
+        d = "{'content': "+posts.blog_content+" , 'title': "+posts.title+"}"
+        #jdog = json.load(d)
+        self.response.headers['Content-Type'] = 'json'
+        self.response.write(d)
+
+        
+class Blog2Json(webapp2.RequestHandler):
+    def get(self):
+        self.response.write('This is a test also')
+
+
+    
 class LoginPage(webapp2.RequestHandler):
     def get(self):
         self.response.write(render_str('login.html'))
@@ -252,5 +273,5 @@ class SignupPage(webapp2.RequestHandler):
 
 
 application = webapp2.WSGIApplication([('/', MainPage),('/signup', SignupPage),('/welcome', WelcomePage),('/blog/newpost', NewPost)
-                                       ,('/blog', BlogPage), ('/login', LoginPage), ('/logout', LogoutPage)
-                                       ,('/blog/([0-9]+)', PermaPost)], debug=True)
+                                       ,('/blog', BlogPage), ('/login', LoginPage), ('/logout', LogoutPage),('/blog.json', Blog2Json)
+                                       ,('/blog/([0-9]+)', PermaPost), ('/blog/([0-9]+).json', Perma2Json)], debug=True)
