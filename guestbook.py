@@ -7,6 +7,7 @@ import string
 import hashlib
 import hmac
 import json
+import time
 
 import webapp2
 import jinja2
@@ -14,6 +15,7 @@ import jinja2
 SECRET = "FOST"
 
 from google.appengine.ext import db
+from google.appengine.api import memcache
 
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_env = jinja2.Environment(loader = jinja2.FileSystemLoader(template_dir),
@@ -114,37 +116,74 @@ class BlogPost(db.Model):
     title = db.StringProperty(required = True)
     blog_content = db.TextProperty(required = True)
     date_created = db.DateTimeProperty(auto_now_add = True)
+    last_modified = db.DateTimeProperty(auto_now = True)
+
+
+    def as_json(self):
+        time_format = '%c'
+        d = {'subject': self.title,
+             'content' : self.blog_content,
+             'created' : self.date_created.strftime(time_format),
+             'last_modified' : self.last_modified.strftime(time_format)
+            }
+        return d
+class Flusher(webapp2.RequestHandler):
+    def get(self):
+        memcache.flush_all()
+        self.redirect('/blog' )
+        
 
 class User(db.Model):
     username = db.StringProperty(required = True)
     password = db.StringProperty(required = True)
 
-    
+oldtime = time.mktime(time.localtime())
+oldptime = time.mktime(time.localtime())  
 class BlogPage(webapp2.RequestHandler):
+    global oldtime
+
+        
     def get(self):
-        posts = db.GqlQuery('SELECT * from BlogPost order by date_created desc')
-        self.response.write(render_str('blog.html', posts = posts))
+        global oldtime
+        posts = memcache.get('front')
+        if (posts == None):
+            posts = db.GqlQuery('SELECT * from BlogPost order by date_created desc')
+            memcache.set('front', posts)
+            oldtime = time.mktime(time.localtime())
+        self.response.write(render_str('blog.html', posts = posts, sometime = (time.mktime(time.localtime())-oldtime)))
 
 class PermaPost(webapp2.RequestHandler):
+    
     def get(self, post_id):
+        global oldptime
         ## search for the post in the database using GQL
         ## Use that post to generate a page with a single blog post.
-        key = db.Key.from_path('BlogPost', int(post_id))
-        posts = db.get(key)
-        self.response.write(render_str('permalink.html', posts = posts))
+        posts = memcache.get(str(post_id))
+        if (posts == None):
+            key = db.Key.from_path('BlogPost', int(post_id))
+            posts = db.get(key)
+            memcache.set(str(post_id), posts)
+            oldptime = time.mktime(time.localtime())
+        self.response.write(render_str('permalink.html', posts = posts, sometime = (time.mktime(time.localtime())-oldptime)))
         
 
 class NewPost(webapp2.RequestHandler):
+    global oldtime
+    
     def get(self):
         self.response.write(render_str('newpost.html'))
 
     def post(self):
+        global oldtime
         old_title = self.request.get('subject')
         obp = self.request.get('content')
         if old_title and obp:
             bp = BlogPost(title = old_title, blog_content = obp)
             bp.put()
-            # get the ID and pass it to the redirect page
+            posts = db.GqlQuery('SELECT * from BlogPost order by date_created desc')
+            memcache.delete('front')
+            memcache.set('front', posts)
+            oldtime = time.mktime(time.localtime())
             self.redirect('/blog/'+str(bp.key().id()) )
         else: 
             self.response.write(render_str('newpost.html', old_title = old_title, old_blog_post = obp))
@@ -166,15 +205,18 @@ class Perma2Json(webapp2.RequestHandler):
         ## Use that post to generate a page with a single blog post.
         key = db.Key.from_path('BlogPost', int(post_id))
         posts = db.get(key)
-        d = "{'content': "+posts.blog_content+" , 'title': "+posts.title+"}"
-        #jdog = json.load(d)
-        self.response.headers['Content-Type'] = 'json'
-        self.response.write(d)
+        jdog = json.dumps(posts.as_json())
+        self.response.headers['Content-Type'] = 'application/json; charset=UTF-8'
+        self.response.write(jdog)
 
         
 class Blog2Json(webapp2.RequestHandler):
     def get(self):
-        self.response.write('This is a test also')
+        posts = db.GqlQuery('SELECT * from BlogPost order by date_created desc')
+        jdog = json.dumps([p.as_json() for p in posts])
+        self.response.headers['Content-Type'] = 'application/json; charset=UTF-8'
+        self.response.write(jdog)
+
 
 
     
@@ -272,6 +314,6 @@ class SignupPage(webapp2.RequestHandler):
 
 
 
-application = webapp2.WSGIApplication([('/', MainPage),('/signup', SignupPage),('/welcome', WelcomePage),('/blog/newpost', NewPost)
-                                       ,('/blog', BlogPage), ('/login', LoginPage), ('/logout', LogoutPage),('/blog.json', Blog2Json)
-                                       ,('/blog/([0-9]+)', PermaPost), ('/blog/([0-9]+).json', Perma2Json)], debug=True)
+application = webapp2.WSGIApplication([('/', MainPage),('/blog/signup', SignupPage),('/welcome', WelcomePage),('/blog/newpost', NewPost),('/blog/flush', Flusher)
+                                       ,('/blog', BlogPage), ('/blog/login', LoginPage), ('/blog/logout', LogoutPage),('/blog/\.json', Blog2Json)
+                                       ,('/blog/([0-9]+)', PermaPost), ('/blog/([0-9]+)\.json', Perma2Json)], debug=True)
