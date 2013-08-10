@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import json
 import time
+import logging
 
 import webapp2
 import jinja2
@@ -17,64 +18,58 @@ SECRET = "FOST"
 from google.appengine.ext import db
 from google.appengine.api import memcache
 
+
+PAGE_RE = r'(/(?:[a-zA-Z0-9_-]+/?)*)'
+
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
 jinja_env = jinja2.Environment(loader = jinja2.FileSystemLoader(template_dir),
-                               autoescape = True)
-
-def render_str(template, **params):
-    t = jinja_env.get_template(template)
-    return t.render(params)
-
-def make_salt():
-    return ''.join(random.choice(string.letters) for x in xrange(5))
+                               autoescape = False)
 
 
-def make_pw_hash(name, pw, salt=None):
-    if salt == None:
-        salt = make_salt()
-    h = hashlib.sha256(name + pw + salt).hexdigest()
-    return '%s,%s' % (h, salt)
+class MainHandler(webapp2.RequestHandler):
+    def render_str(self, template, **params):
+        t = jinja_env.get_template(template)
+        return t.render(params)
 
-def valid_pw(name, pw, h):
-    cats = h.split(",")
-    if make_pw_hash(name,pw,cats[1]) == h:
-        return True
+    def render(self, template, **kw):
+        self.response.out.write(self.render_str(template, **kw))
 
-def hash_str(s):
-    return hmac.new(SECRET,s).hexdigest()
+    def make_salt(self):
+        return ''.join(random.choice(string.letters) for x in xrange(5))
 
-def make_secure_val(s):
-    return "%s|%s" % (s, hash_str(s))
+    def make_pw_hash(self, name, pw, salt=None):
+        if salt == None:
+            salt = self.make_salt()
+        h = hashlib.sha256( name +pw+ salt).hexdigest()
+        return '%s,%s' % (h, salt)
 
-def check_secure_val(h):
-    val = h.split('|')[0]
-    if h == make_secure_val(val):
-        return val
+    def valid_pw(self, name, pw, h):
+        cats = h.split(",")
+        if self.make_pw_hash(name,pw,cats[1]) == h:
+            return True
 
-form = """
-<form method="post">
-<textarea rows="5" cols="30" name="text"></textarea>
-<br>
-<input type="submit">
+    def hash_str(self, s):
+        return hmac.new(SECRET,s).hexdigest()
 
-</form>
-"""
+    def make_secure_val(self, s):
+        return "%s|%s" % (s, self.hash_str(s))
 
-form1 = """
-<form method="post">
-<textarea rows="5" cols="30" name="text">%s</textarea>
-<br>
-<input type="submit">
+    def check_secure_val(self, h):
+        val = h.split('|')[0]
+        if h == self.make_secure_val(val):
+            return val
 
-</form>
-"""
+        
+class HomePage(MainHandler):
+    def get(self):
+        self.response.out.write("mainpage")
 
-
-class MainPage(webapp2.RequestHandler):
+        
+class ROT13Handler(MainHandler):
 
     def get(self):
         #self.response.headers['Content-Type'] = 'text/plain'
-        self.response.write(form)
+        self.render("ROT13.html")
         
     def wtta(self,s):
         #cypher all the letters
@@ -96,18 +91,18 @@ class MainPage(webapp2.RequestHandler):
     	
     def post(self):
 	#self.response.headers['Content-Type'] = 'text/plain'
-	self.response.write(form1 % self.wtta(self.request.get('text')))
+	self.render("ROT13.html", secret_text = self.wtta(self.request.get('text')))
 	
 	
-class WelcomePage(webapp2.RequestHandler):
+class WelcomePage(MainHandler):
     ## add some shit to check the cookie
     def get(self):
         #validate cookie
         userdude = self.request.cookies.get('user_id')
         #self.response.write(userdude)
-        name = check_secure_val(userdude)
+        name = self.check_secure_val(userdude)
         if name:
-            self.response.write(render_str('welcome.html', username = name))
+            self.render('welcome.html', username = name)
         else:
             self.redirect('/signup')
 
@@ -127,7 +122,9 @@ class BlogPost(db.Model):
              'last_modified' : self.last_modified.strftime(time_format)
             }
         return d
-class Flusher(webapp2.RequestHandler):
+
+    
+class Flusher(MainHandler):
     def get(self):
         memcache.flush_all()
         self.redirect('/blog' )
@@ -137,25 +134,22 @@ class User(db.Model):
     username = db.StringProperty(required = True)
     password = db.StringProperty(required = True)
 
-oldtime = time.mktime(time.localtime())
-oldptime = time.mktime(time.localtime())  
-class BlogPage(webapp2.RequestHandler):
+
+
+class BlogPage(MainHandler):
     global oldtime
 
         
     def get(self):
-        global oldtime
         posts = memcache.get('front')
         if (posts == None):
             posts = db.GqlQuery('SELECT * from BlogPost order by date_created desc')
             memcache.set('front', posts)
-            oldtime = time.mktime(time.localtime())
-        self.response.write(render_str('blog.html', posts = posts, sometime = (time.mktime(time.localtime())-oldtime)))
+        self.render('blog.html', posts = posts)
 
-class PermaPost(webapp2.RequestHandler):
+class PermaPost(MainHandler):
     
     def get(self, post_id):
-        global oldptime
         ## search for the post in the database using GQL
         ## Use that post to generate a page with a single blog post.
         posts = memcache.get(str(post_id))
@@ -163,18 +157,14 @@ class PermaPost(webapp2.RequestHandler):
             key = db.Key.from_path('BlogPost', int(post_id))
             posts = db.get(key)
             memcache.set(str(post_id), posts)
-            oldptime = time.mktime(time.localtime())
-        self.response.write(render_str('permalink.html', posts = posts, sometime = (time.mktime(time.localtime())-oldptime)))
+        self.render('permalink.html', posts = posts)
         
 
-class NewPost(webapp2.RequestHandler):
-    global oldtime
-    
+class NewPost(MainHandler):
     def get(self):
-        self.response.write(render_str('newpost.html'))
+        self.render('newpost.html')
 
     def post(self):
-        global oldtime
         old_title = self.request.get('subject')
         obp = self.request.get('content')
         if old_title and obp:
@@ -183,18 +173,17 @@ class NewPost(webapp2.RequestHandler):
             posts = db.GqlQuery('SELECT * from BlogPost order by date_created desc')
             memcache.delete('front')
             memcache.set('front', posts)
-            oldtime = time.mktime(time.localtime())
-            self.redirect('/blog/'+str(bp.key().id()) )
+            self.redirect('/blog/'+str(bp.key().id()))
         else: 
-            self.response.write(render_str('newpost.html', old_title = old_title, old_blog_post = obp))
+            self.render('newpost.html', old_title = old_title, old_blog_post = obp)
 
             
-class LogoutPage(webapp2.RequestHandler):
+class LogoutPage(MainHandler):
     #nuke cookie
     #redirect
     def get(self):
         self.response.headers.add_header('Set-Cookie',str('user_id=; Path=/'))
-        self.redirect('/signup')
+        self.redirect('/wiki/signup')
     
 class Perma2Json(webapp2.RequestHandler): 
     # Implement Json here
@@ -208,8 +197,7 @@ class Perma2Json(webapp2.RequestHandler):
         jdog = json.dumps(posts.as_json())
         self.response.headers['Content-Type'] = 'application/json; charset=UTF-8'
         self.response.write(jdog)
-
-        
+    
 class Blog2Json(webapp2.RequestHandler):
     def get(self):
         posts = db.GqlQuery('SELECT * from BlogPost order by date_created desc')
@@ -217,29 +205,27 @@ class Blog2Json(webapp2.RequestHandler):
         self.response.headers['Content-Type'] = 'application/json; charset=UTF-8'
         self.response.write(jdog)
 
-
-
-    
-class LoginPage(webapp2.RequestHandler):
+class LoginPage(MainHandler):
     def get(self):
-        self.response.write(render_str('login.html'))
+        self.render('login.html')
     	
     def post(self):
         self.username = self.request.get('username')
         self.password = self.request.get('password')
         #user = User.all().filter('username= '+self.username).get()
         user = db.GqlQuery("SELECT * FROM User WHERE username IN ('"+self.username+"')").get()
-        if user and valid_pw(self.username, self.password, user.password):
-            self.response.headers.add_header('Set-Cookie',str('user_id='+make_secure_val(self.request.get('username'))+'; Path=/'))
+        if user and self.valid_pw(self.username, self.password, user.password):
+            self.response.headers.add_header('Set-Cookie',str('user_id='+self.make_secure_val(self.request.get('username'))+'; Path=/'))
             self.redirect('/welcome')
         else:
-            self.response.write(render_str('login.html',login_error='Login Error'))
+            self.render('login.html',login_error='Login Error')
         
 
-class SignupPage(webapp2.RequestHandler):
+class SignupPage(MainHandler):
     USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
     PW_RE = re.compile(r"^.{3,20}$")
     EMAIL_RE = re.compile(r"^[\S]+@[\S]+\.[\S]+$")
+    
     ##
     # Validate the username
     # @param: username
@@ -269,8 +255,7 @@ class SignupPage(webapp2.RequestHandler):
         return self.EMAIL_RE.match(email) or email == ""
     
     def get(self):
-        #self.response.headers['Content-Type'] = 'text/plain'
-        self.response.write(render_str('signup.html'))
+        self.render('signup.html')
     	
     def post(self):
         vflag = True
@@ -298,22 +283,34 @@ class SignupPage(webapp2.RequestHandler):
         if vflag:
             key = db.Key.from_path('User', oldtext1)
             if db.get(key):
-                self.response.write(render_str('signup.html', oldtext ='',usernameerror="User already exists.", passworderror= passworderror1, passworderror2=passworderror3,emailerror=emailerror1))
+                self.render('signup.html', oldtext ='',usernameerror="User already exists.", passworderror= passworderror1, passworderror2=passworderror3,emailerror=emailerror1)
             else:
                 
                 #self.redirect('/welcome?username='+self.request.get('password'))
-                newuser = User(username = oldtext1, password = make_pw_hash(oldtext1,self.request.get('password')))
+                newuser = User(username = oldtext1, password = self.make_pw_hash(oldtext1,self.request.get('password')))
                 newuser.put()
-                self.response.headers.add_header('Set-Cookie',str('user_id='+make_secure_val(self.request.get('username'))+'; Path=/'))
+                self.response.headers.add_header('Set-Cookie',str('user_id='+self.make_secure_val(self.request.get('username'))+'; Path=/'))
                 self.redirect('/welcome')
         else:
-            self.response.write(render_str('signup.html', oldtext =oldtext1,usernameerror=usernameerror1
+            self.render('signup.html', oldtext =oldtext1,usernameerror=usernameerror1
                                        , passworderror= passworderror1, passworderror2 =passworderror3,
-                                       emailerror =emailerror1))
+                                       emailerror =emailerror1)
 
 
 
 
-application = webapp2.WSGIApplication([('/', MainPage),('/blog/signup', SignupPage),('/welcome', WelcomePage),('/blog/newpost', NewPost),('/blog/flush', Flusher)
-                                       ,('/blog', BlogPage), ('/blog/login', LoginPage), ('/blog/logout', LogoutPage),('/blog/\.json', Blog2Json)
-                                       ,('/blog/([0-9]+)', PermaPost), ('/blog/([0-9]+)\.json', Perma2Json)], debug=True)
+application = webapp2.WSGIApplication([('/', HomePage),
+                                        ('/rot13', ROT13Handler),
+                                       #('/blog/signup', SignupPage),
+                                       #('/welcome', WelcomePage),
+                                       ('/blog/newpost', NewPost),
+                                       ('/blog/flush', Flusher),
+                                       ('/blog', BlogPage),
+                                       ('/blog/login', LoginPage),
+                                       ('/blog/logout', LogoutPage),
+                                       ('/blog/\.json', Blog2Json),
+                                       ('/blog/([0-9]+)', PermaPost),
+                                       ('/blog/([0-9]+)\.json', Perma2Json),
+
+
+                                       ], debug=True)
