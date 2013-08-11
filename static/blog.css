@@ -1,0 +1,35 @@
+body {
+    font-family: Helvetica, Arial, sans-serif;
+    width: 800px;
+    margin: 0 auto;
+    padding: 10px;
+    color: #333;
+}
+h1{
+	text-align: center;
+	padding-bottom: 20px;
+
+
+}
+
+.title {
+	font-family:inherit;
+	font-size: 20px;
+	font-weight:bold;
+
+}
+
+.content{
+	font-family:inherit;
+	font-size: 16px;
+	
+	
+
+}
+
+.post {
+	padding-top:25px;
+	border-bottom: 1px solid #989898 ;
+	
+
+}

@@ -1,17 +1,17 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<title>Miller Time</title>
-		<link rel="stylesheet" type="text/css" href="blog.css">
+		<link type="text/css" rel="stylesheet" href="/static/blog.css" />
+		<title>Areas of My Expertise</title>
+		
 	</head>
 	
 	<body>
-		<h1>My Blog</h1>
-		<hr>
+		<h1>The Areas of My Expertise</h1>
 			{% for post in posts %}
-				<div>
-					<div>{{post.title}}</div>
-					<pre>{{post.blog_content | safe}}</pre>
+				<div class = "post">
+					<div class = "title">{{post.title}}</div>
+					<pre class = "content">{{post.blog_content | safe}}</pre>
 				</div>
 			{% endfor %}
 	</body>

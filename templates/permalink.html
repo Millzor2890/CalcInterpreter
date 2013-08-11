@@ -1,17 +1,16 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<title>Miller Time</title>
-		<link rel="stylesheet" type="text/css" href="blog.css">
+		<title>Areas of My Expertise</title>
+		<link rel="stylesheet" type="text/css" href="/static/blog.css">
 	</head>
 	
 	<body>
-		<h1>My Blog</h1>
-		<hr>
+		<h1>The Areas of My Expertise</h1>
 			
-				<div>
-					<div>{{posts.title}}</div>
-					<pre>{{posts.blog_content | safe}}</pre>
+				<div class = "post">
+					<div class = "title">{{posts.title}}</div>
+					<pre class = "content">{{posts.blog_content | safe}}</pre>
 				</div>
 	</body>
 </html>
