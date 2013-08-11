@@ -11,8 +11,7 @@
 			
 				<div>
 					<div>{{posts.title}}</div>
-					<pre>{{posts.blog_content}}</pre>
+					<pre>{{posts.blog_content | safe}}</pre>
 				</div>
-		<label>Queried {{sometime}} seconds ago</label>
 	</body>
 </html>

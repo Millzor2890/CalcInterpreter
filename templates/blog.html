@@ -11,10 +11,8 @@
 			{% for post in posts %}
 				<div>
 					<div>{{post.title}}</div>
-					<pre>{{post.blog_content}}</pre>
+					<pre>{{post.blog_content | safe}}</pre>
 				</div>
 			{% endfor %}
-			
-			<label>Queried {{sometime}} seconds ago</label>
 	</body>
 </html>
